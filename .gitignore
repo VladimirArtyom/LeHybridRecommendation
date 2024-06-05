@@ -1,4 +1,4 @@
 *.csv
-Exploration/
 Embeddings/
+caches/
 *.pth

@@ -1,4 +1,6 @@
 import pandas as pd
+import pickle
+import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -37,6 +39,16 @@ class ContentBasedRecommender():
         self.cv_content_similarity = None
         self.cv_metadata_similarity = None
 
+        self.savePathEmbeddingCVMetadata: str = "caches/Embedding_CV_Metadata.pkl"
+        self.savePathEmbeddingCVContent: str = "caches/Embedding_CV_Content.pkl"
+        self.savePathEmbeddingGlove: str = "caches/Embedding_Glove.pkl"
+        self.savePathEmbeddingPretrained: str = "caches/Embedding_PreTrained.pkl"
+
+        self.savePathSimilarityCVMetadata:str = "caches/Similarity_CV_Metadata.pkl"
+        self.savePathSimilarityCVContent:str = "caches/Similarity_CV_Content.pkl"
+        self.savePathSimilarityGlove: str = "caches/Similarity_Glove.pkl"
+        self.savePathSimilarityPretrained: str = "caches/Similarity_PreTrained.pkl"
+
     def prepareRecipeIndices(self, column_name: str):
         df_copy = self.df.copy().reset_index()
         df_copy = df_copy.set_index(column_name)
@@ -45,7 +57,7 @@ class ContentBasedRecommender():
     def preprocess_dataset(self):
         self.df.fillna("[]", inplace=True)
         self.df = self.df[self.column_of_interest].copy()
-        self.df[self.column_of_interest[0]] = self.df[self.column_of_interest[0]].apply(self.lower_case)
+        #self.df[self.column_of_interest[0]] = self.df[self.column_of_interest[0]].apply(self.lower_case)
         self.df[self.column_of_interest[1]] = self.df[self.column_of_interest[1]].apply(self.lower_case)
         self.df[self.column_of_interest[2]] = self.df[self.column_of_interest[2]].apply(self.lower_case)
         self.df[self.column_of_interest[3]] = self.df[self.column_of_interest[3]].apply(self.lower_case)
@@ -91,47 +103,99 @@ class ContentBasedRecommender():
         elif(column == "contents_metadata"):
            self.countVectorizer_metadata = self.cv_model_metadata.fit_transform(self.df["contents_metadata"])
     
-    def fit(self, column_1: str, column_2: str):
-        self.fitCountVectorizer(column_1) # CV for Contents
-        self.fitCountVectorizer(column_2) # CV for Metadata
-        self.fitEmbedding(column_1)
-        self.fitPretrainedModel(column_1)
+    def fit(self, column_1: str, column_2: str,
+            isUsingEmbedding: bool = False, isUsingPretrainedModel: bool = False):
+        if self.checkCache(self.savePathEmbeddingCVContent) == False:
+            self.fitCountVectorizer(column_1) # CV for Contents
+            self.saveCache(self.savePathEmbeddingCVContent, self.countVectorizer_content)
+        else:
+            self.countVectorizer_content = self.loadCache(self.savePathEmbeddingCVContent)
+        
+        if self.checkCache(self.savePathEmbeddingCVMetadata) == False:
+            self.fitCountVectorizer(column_2) # CV for Metadata
+            self.saveCache(self.savePathEmbeddingCVMetadata, self.countVectorizer_metadata)
+        else:
+            self.countVectorizer_metadata = self.loadCache(self.savePathEmbeddingCVMetadata)
+        if (self.checkCache(self.savePathEmbeddingGlove) == False and isUsingEmbedding):
+            self.fitEmbedding(column_1)
+            self.saveCache(self.savePathEmbeddingGlove, self.embedding_content)
+        else:
+            self.embedding_content = self.loadCache(self.savePathEmbeddingGlove)
 
+        if (self.checkCache(self.savePathEmbeddingPretrained) ==False and isUsingPretrainedModel):
+            self.fitPretrainedModel(column_1)
+            self.saveCache(self.savePathEmbeddingPretrained, self.pretrained_model_embedding)
+        else:
+            self.pretrained_model_embedding = self.loadCache(self.savePathEmbeddingPretrained)
 
-    def calculate_similarity(self):
-        self.cv_content_similarity = cosine_similarity(self.countVectorizer_content,
-                                                       self.countVectorizer_content)
+    def checkCache(self, path: str):
+        if os.path.exists(path):
+            return True
+        return False
 
-        self.cv_metadata_similarity = cosine_similarity(self.countVectorizer_metadata,
-                                                        self.countVectorizer_metadata)
+    def saveCache(self, path: str, objectFile):
+        with open(path, 'wb') as f:
+            pickle.dump(objectFile, f)
 
-        self.embedding_similarity = cosine_similarity(self.embedding_content, self.embedding_content)
+    def loadCache(self, path: str):
+        with open(path, "rb") as f:
+            return pickle.load(f)
 
-        self.pretrained_model_similarity = cosine_similarity(self.pretrained_model_embedding,
-                                                             self.pretrained_model_embedding)
+    def calculate_similarity(self, isUsingEmbedding: bool = False, isUsingPretrainedModel: bool = False):
+        if (self.checkCache(self.savePathSimilarityCVContent) == False):
+            self.cv_content_similarity = cosine_similarity(self.countVectorizer_content,
+                                                        self.countVectorizer_content)
+            self.saveCache(self.savePathSimilarityCVContent, self.cv_content_similarity)
+        else :
+            self.cv_content_similarity = self.loadCache(self.savePathSimilarityCVContent)
 
+        
+        if (self.checkCache(self.savePathSimilarityCVMetadata) == False):
+            self.cv_metadata_similarity = cosine_similarity(self.countVectorizer_metadata,
+                                                            self.countVectorizer_metadata)
+            self.saveCache(self.savePathSimilarityCVMetadata, self.cv_metadata_similarity)
+        else:
+            self.cv_metadata_similarity = self.loadCache(self.savePathSimilarityCVContent)
+
+        if (self.checkCache(self.savePathSimilarityGlove) == False and isUsingEmbedding):
+            self.embedding_similarity = cosine_similarity(self.embedding_content, self.embedding_content)
+            self.saveCache(self.savePathSimilarityGlove, self.embedding_similarity)
+
+        else:
+            self.embedding_similarity = self.loadCache(self.savePathSimilarityGlove)
+        
+        if self.checkCache(self.savePathSimilarityPretrained) == False and isUsingPretrainedModel:
+            self.pretrained_model_similarity = cosine_similarity(self.pretrained_model_embedding,
+                                                                self.pretrained_model_embedding)
+            self.saveCache(self.savePathSimilarityPretrained, self.pretrained_model_similarity)
+        else: 
+            self.pretrained_model_similarity = self.loadCache(self.savePathSimilarityPretrained)
         print("Similarity matrix is generated!")
-        print(f"{self.cv_content_similarity.shape}")
-        print(f"{self.cv_metadata_similarity.shape}")
-        print(f"{self.embedding_similarity.shape}")
-        print(f"{self.pretrained_model_similarity.shape}")
 
-    def get_recommendation(self, inputRecipe: str, topN: int , algorithm: ContentBasedEnum = ContentBasedEnum.CV_Content):
-        inputRecipe = inputRecipe.lower()
+    def convertToRecipesId(self, listRecipes: List[int]):
+        realRecipes : List = []
+        for value in (listRecipes):
+            realRecipes.append(self.recipeIndices[self.recipeIndices.values == value].index[0])
+        return realRecipes
+
+
+    def get_recommendation(self, inputRecipe, topN: int , algorithm: ContentBasedEnum = ContentBasedEnum.CV_Content):
+        #inputRecipe = inputRecipe.lower()
         indexRecipe = self.recipeIndices[inputRecipe]
         similarity = []
         if (algorithm == ContentBasedEnum.CV_Metadata):
             similarity = list(enumerate(self.cv_metadata_similarity[indexRecipe]))
         elif (algorithm == ContentBasedEnum.CV_Content):
             similarity = list(enumerate(self.cv_content_similarity[indexRecipe]))
-        elif (algorithm == ContentBasedEnum.E_Content):
+        elif (algorithm == ContentBasedEnum.E_Content and self.embedding_similarity is not None):
             similarity = list(enumerate(self.embedding_similarity[indexRecipe]))
-        elif (algorithm == ContentBasedEnum.PRE_Content):
+        elif (algorithm == ContentBasedEnum.PRE_Content and self.pretrained_model_similarity is not None):
             similarity = list(enumerate(self.pretrained_model_similarity[indexRecipe]))
         similarity = sorted(similarity, key=lambda x: np.average(x[1]), reverse=True)[:topN]
-    
+
         recommendationRecipes: List[str] = [i[0] for i in similarity]
-        return recommendationRecipes
+        realRecipesId = self.convertToRecipesId(recommendationRecipes)
+        return realRecipesId
     
     def cleanStr(self, x : str):
         x = x.strip()

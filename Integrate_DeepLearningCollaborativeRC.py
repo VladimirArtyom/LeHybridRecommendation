@@ -4,6 +4,7 @@ import torch
 import math
 from itertools import zip_longest
 
+import pickle
 from sklearn.model_selection import train_test_split
 from torch import nn
 from torch import optim
@@ -91,7 +92,7 @@ class EmbeddingNetwork(nn.Module):
         out = torch.sigmoid(self.output(x))
         if minmax is not None:
             min_rating, max_rating = minmax
-            out = out * (max_rating - min_rating + 1) + 0.2
+            out = out * (max_rating - min_rating + 1) + min_rating - 0.5
         return out
         
     
@@ -279,11 +280,27 @@ class DeepLearningCollaborativeBasedRecommender():
 
     def getRecommendation(self, userId: int, topN: int):
         userIdMultiples = torch.LongTensor(self.newRecipes.shape[0] * [userId])
-        print(userIdMultiples)
         tensorRecipes = torch.LongTensor(self.newRecipes)
         pred = self.network(userIdMultiples, tensorRecipes, self.minMax).detach().numpy().reshape(-1)
-        dfTemp = pd.DataFrame({"recipeId": self.newRecipes.values, "rating": pred})
+        dfTemp = pd.DataFrame({"recipeId": self.newRecipes.values, "est": pred})
         dfTemp["userId"] = userIdMultiples
-        dfTemp["originalRecipeId"] = dfTemp["recipeId"].apply(self.getRealRecipeId)
-        dfTemp["originalUserId"] = dfTemp["userId"].apply(self.getRealUserId)
-        return dfTemp.sort_values("rating", ascending=False)[:topN]
+        dfTemp["iid"] = dfTemp["recipeId"].apply(self.getRealRecipeId)
+        dfTemp["uid"] = dfTemp["userId"].copy()
+        dfTemp["userId"] = dfTemp["userId"].apply(self.getRealUserId)
+        return dfTemp.sort_values("est", ascending=False)[:topN]
+
+    def saveModel(self, modelDict, history, lrHistory, path: str):
+        torch.save(modelDict, path)
+
+        with open(f"{path}_history.pkl", "wb") as f:
+            pickle.dump(history, f)
+
+        with open(f"{path}_history_lr.pkl", "wb") as f:
+            pickle.dump(lrHistory, f)
+
+    def loadModel(self,  path: str):
+        return torch.load(path)
+
+    def loadPickle(self, path: str, pickleName: str):
+        with open(f"{path}{pickleName}.pkl", "rb") as f:
+            return pickle.load(f)

@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.metrics import root_mean_squared_error
 from surprise import Dataset, Reader
-from surprise import SVD, NMF
+from surprise import SVD, NMF, KNNBasic
 from surprise.accuracy import rmse, mse
 from surprise.model_selection import train_test_split
 from typing import List , Tuple
@@ -13,17 +13,14 @@ np.random.seed(0)
 class SurpriseCollaborativeBasedRecommender():
     def __init__(self, datasetPath: str,
                   ratingScale: Tuple,
-                  useCols: List[str],
-                  measures: List[str] = ["RMSE"]):
+                  useCols: List[str]):
         self.df: pd.DataFrame = pd.read_csv(datasetPath, usecols=useCols)
         self.reader: Reader = Reader(rating_scale=ratingScale)
         self.surpriseDF = Dataset.load_from_df(self.df, self.reader)
-        self.modelMeasures = measures
-
         #  Model 
         self.svdModel = SVD()
-        self.nmfModel = NMF()
-    def prepareRecipeIndices(self, filePath: str, column_name: str):
+        self.nmfModel = KNNBasic()
+    def prepareRecipeIndices(self, column_name: str):
         df_copy = self.df.copy().reset_index()
         df_copy = df_copy.set_index(column_name)
         self.recipeIndices = pd.Series(df_copy["index"], index=df_copy.index)
@@ -173,8 +170,11 @@ class SurpriseCollaborativeBasedRecommender():
         print(f"takeSvd: {takeSvd}, takeNMF: {takeNMF}")
         predsSVDTop = results[1]["preds_svd"][:takeSvd]
         predsNMFTop = results[1]["preds_nmf"][:takeNMF]
-        
-        return predsSVDTop, predsNMFTop
+        dataFrameSVD = pd.DataFrame(predsSVDTop)
+        dataFrameNMF = pd.DataFrame(predsNMFTop)
+        dfReturn = pd.concat([dataFrameSVD, dataFrameNMF], ignore_index=True)
+        dfReturn.drop(columns=["details","r_ui"], inplace=True)
+        return dfReturn
 
 """
 if __name__ == "__main__":
