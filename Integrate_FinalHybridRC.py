@@ -19,6 +19,22 @@ np.random.seed(0)
 class HybridRecommender:
 
     def __init__(self, seed: int, path="./recipes_filtered.csv"):
+        """
+        Initializes a new instance of the HybridRecommender class.
+
+        Args:
+            seed (int): The seed value for random number generation.
+            path (str, optional): The path to the CSV file containing the recipe dataset. Defaults to "./recipes_filtered.csv".
+
+        Initializes the following instance variables:
+            - contentBasedRecommender (None): The content-based recommender instance.
+            - supriseCFRecommender (None): The Surprise collaborative filtering recommender instance.
+            - deeplearningCFRecommender (None): The deep learning collaborative filtering recommender instance.
+            - reviewDataset (pandas.DataFrame): The recipe dataset loaded from the CSV file.
+
+        Returns:
+            None
+        """
         self.contentBasedRecommender = None
         self.supriseCFRecommender = None 
         self.deeplearningCFRecommender = None
@@ -28,6 +44,20 @@ class HybridRecommender:
     def setupContentBasedRecommender(self, datasetPath: str,
                                     useCols: List[str], gloveFile="Embeddings/glove.6B.50d.txt",
                                     modelName="all-MiniLM-L12-v2", isEmbedding = True, isPretrained= True):
+        """
+        Initializes and sets up the content-based recommender system.
+
+        Args:
+            datasetPath (str): The path to the CSV file containing the recipe dataset.
+            useCols (List[str]): The list of columns to use from the dataset.
+            gloveFile (str, optional): The path to the GloVe embedding file. Defaults to "Embeddings/glove.6B.50d.txt".
+            modelName (str, optional): The name of the pretrained model. Defaults to "all-MiniLM-L12-v2".
+            isEmbedding (bool, optional): Whether to use embeddings in the recommender system. Defaults to True.
+            isPretrained (bool, optional): Whether to use a pretrained model in the recommender system. Defaults to True.
+
+        Returns:
+            None
+        """
         self.contentBasedRecommender = ContentBasedRecommender(datasetPath, useCols)
         self.contentBasedRecommender.preprocess_dataset()
         self.contentBasedRecommender.prepareRecipeIndices("RecipeId")
@@ -38,6 +68,18 @@ class HybridRecommender:
 
     def setupSurpriseCollaborativeRecommender(self, datasetPath: str, useCols: List[str],
                                                ratingScale: Tuple, targetAlign = ["AuthorId", "RecipeId", "Rating"]):
+        """
+        Initializes and sets up the Surprise collaborative filtering recommender system.
+
+        Args:
+            datasetPath (str): The path to the CSV file containing the recipe dataset.
+            useCols (List[str]): The list of columns to use from the dataset.
+            ratingScale (Tuple): The range of ratings in the dataset.
+            targetAlign (List[str], optional): The list of columns to align in the dataset. Defaults to ["AuthorId", "RecipeId", "Rating"].
+
+        Returns:
+            None
+        """
         self.supriseCFRecommender = SurpriseCollaborativeBasedRecommender(datasetPath,
                                                                          ratingScale,
                                                                          useCols)
@@ -49,6 +91,20 @@ class HybridRecommender:
                                                   networkSize: int = 150,
                                                   targetAlign = ["AuthorId", "RecipeId", "Rating"],
                                                   isSaveModel: bool = True, modelPath = "caches/model.pt"):
+        """
+        Initializes and sets up the deep learning collaborative recommender system.
+
+        Args:
+            datasetPath (str): The path to the dataset file.
+            useCols (List[str]): The list of columns to use from the dataset.
+            networkSize (int, optional): The size of the network. Defaults to 150.
+            targetAlign (List[str], optional): The list of target columns to align the dataset. Defaults to ["AuthorId", "RecipeId", "Rating"].
+            isSaveModel (bool, optional): Whether to save the trained model. Defaults to True.
+            modelPath (str, optional): The path to save the trained model. Defaults to "caches/model.pt".
+
+        Returns:
+            None
+        """
         self.deeplearningCFRecommender = DeepLearningCollaborativeBasedRecommender(datasetPath, useCols)
         self.deeplearningCFRecommender.alignDataset(targetAlign)
         self.deeplearningCFRecommender.createDataset()
@@ -113,12 +169,43 @@ class HybridRecommender:
         return recipeIds
 
     def showRecommendation(self, indexRecommendations: List[int], indexRecommendationSurprise: List[int]):
+        """
+        Concatenates two DataFrames containing recommendations based on content and surprise respectively.
+
+        Args:
+            indexRecommendations (List[int]): A list of indices representing recommendations based on content.
+            indexRecommendationSurprise (List[int]): A list of indices representing recommendations based on surprise.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the concatenated recommendations.
+
+        Description:
+            This function takes in two lists of indices, `indexRecommendations` and `indexRecommendationSurprise`,
+            which represent recommendations based on content and surprise respectively. It uses these indices to
+            retrieve the corresponding rows from the `reviewDataset` DataFrame. The function then drops any duplicate
+            rows from each DataFrame and concatenates them together using the `pd.concat()` function. The resulting
+            DataFrame is returned.
+
+        Raises:
+            None
+        """
         recommendationWithContent = self.reviewDataset.loc[indexRecommendations].drop_duplicates()
         recommendationSurprise = self.reviewDataset[self.reviewDataset.index.isin(indexRecommendationSurprise)].drop_duplicates()
 
         return pd.concat([recommendationWithContent, recommendationSurprise], ignore_index=True)
 
     def showRecommendations(self, userId: int, topN: int = 10, parralel: int = 2):
+        """
+        Generates recommendations for a given user based on their userId.
+
+        Args:
+            userId (int): The ID of the user for whom recommendations are generated.
+            topN (int, optional): The number of top recommendations to generate. Defaults to 10.
+            parralel (int, optional): The number of parallel processes to use for generating recommendations. Defaults to 2.
+
+        Returns:
+            List[int]: A list of topN recommendations for the given userId.
+        """
         CFRecommendations = self.getRecommendations(userId, topN, parralel)
 
 

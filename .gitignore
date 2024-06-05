@@ -2,3 +2,4 @@
 Embeddings/
 caches/
 *.pth
+.DS_Store
