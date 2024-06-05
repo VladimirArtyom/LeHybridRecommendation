@@ -144,17 +144,6 @@ class ContentBasedRecommender():
         Returns:
             None
         """
-
-    def setupEmbedding(self, glove_name: str):
-        """
-        Initializes the embedding model using the given GloVe file.
-
-        Parameters:
-            glove_name (str): The path to the GloVe file.
-
-        Returns:
-            None
-        """
         self.pretrained_model_content = SentenceTransformer(modelName)
 
     def setupEmbedding(self, glove_name: str):

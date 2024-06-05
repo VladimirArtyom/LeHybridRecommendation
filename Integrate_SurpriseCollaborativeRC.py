@@ -33,8 +33,10 @@ class SurpriseCollaborativeBasedRecommender():
         self.reader: Reader = Reader(rating_scale=ratingScale)
         self.surpriseDF = Dataset.load_from_df(self.df, self.reader)
         #  Model 
-        self.svdModel = SVD()
-        self.nmfModel = KNNBasic()
+        self.svdModel = SVD(lr_all=0.005, reg_all=0.02, n_epochs=50, n_factors=20,
+                            biased=True)
+        self.nmfModel = NMF(n_factors=200, reg_pu=0.1, reg_bu=0.1,
+                            reg_bi=0.1, lr_bu=0.002, lr_bi=0.005 , biased=True)
     def prepareRecipeIndices(self, column_name: str):
         """
         Prepare the recipe indices for the given column name.
@@ -99,8 +101,10 @@ class SurpriseCollaborativeBasedRecommender():
         """
         #self.svdModel = SVD(lr_all=w1, biased=True)
         #self.nmfModel = NMF(lr_bu=w2, lr_bi=w2, biased=True)
-        self.svdModel = SVD()
-        self.nmfModel = NMF()
+        #self.svdModel = SVD(lr_all=0.005, reg_all=0.02, n_epochs=50, n_factors=20,
+        #                    biased=True)
+        #self.nmfModel = NMF(n_factors=200, reg_pu=0.1, reg_bu=0.1,
+        #                    reg_bi=0.1, lr_bu=0.002, lr_bi=0.005 , biased=True)
         self.svdModel.fit(self.train_set)
         self.nmfModel.fit(self.train_set)
 
@@ -321,7 +325,9 @@ class SurpriseCollaborativeBasedRecommender():
         dfReturn = pd.concat([dataFrameSVD, dataFrameNMF], ignore_index=True)
         dfReturn.drop(columns=["details","r_ui"], inplace=True)
         return dfReturn
-
+    def modelRMSE(self):
+        print(rmse(self.svdModel.test(self.test_set)))
+        print(rmse(self.nmfModel.test(self.test_set)))
 """
 if __name__ == "__main__":
     datasetPathReviews: str = "reviews_filtered.csv"
